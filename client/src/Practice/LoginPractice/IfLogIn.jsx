@@ -1,0 +1,180 @@
+import axiosInstance from "@/api/axios";
+import { LogInContext } from "@/App";
+import { Button } from "@/components/ui/button";
+import { Delete, Edit, Plus, Trash2 } from "lucide-react";
+import React, { useContext, useEffect, useState } from "react";
+import toast from "react-hot-toast";
+
+function IfLogIn() {
+  const { user } = useContext(LogInContext);
+
+  const [formData, setFormData] = useState({ fullName: "", DOB: "" });
+  const [result, setResult] = useState("");
+  const [openEdit, setOpenEdit] = useState(false); // Controls whether the form is for editing or adding
+  const [currentEditId, setCurrentEditId] = useState(null); // Stores the ID of the user being edited
+
+  const formatDate = (dates) => {
+    return new Date(dates).toISOString().split("T")[0];
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    try {
+      if (openEdit) {
+        // Update user data if we're in edit mode
+        const res = await axiosInstance.put(`/user/${currentEditId}`, formData);
+        if (res.data.success) {
+          toast.success("User updated successfully");
+          setOpenEdit(false); // Close edit form after submission
+        }
+      } else {
+        // Add new user if not in edit mode
+        const res = await axiosInstance.post("/user/addUser", formData);
+        if (res.data.success) {
+          toast.success("User added successfully");
+        }
+      }
+      setFormData({ fullName: "", DOB: "" }); // Reset form
+      getAllUsers();
+    } catch (error) {
+      console.error("Error submitting form:", error);
+      toast.error("Failed to submit form");
+    }
+  };
+
+  const handleOnChange = (e) => {
+    const { name, value } = e.target;
+    setFormData((prevData) => ({
+      ...prevData,
+      [name]: value,
+    }));
+  };
+
+  // Fetch user details
+  const getAllUsers = async () => {
+    try {
+      const res = await axiosInstance.get("/user/getUsers");
+      setResult(res.data.data);
+    } catch (error) {
+      console.error("Error fetching users:", error);
+    }
+  };
+
+  // Handle edit click
+  const handleEditUser = (user) => {
+    const formattedDOB = new Date(user.DOB).toISOString().split("T")[0];
+    setFormData({
+      fullName: user.fullName,
+      DOB: formattedDOB,
+    });
+    setCurrentEditId(user._id);
+    setOpenEdit(true);
+  };
+
+  // Handle delete user
+  const handleDeleteUser = async (e) => {
+    try {
+      const id = e.target.getAttribute("data-id");
+      if (!id) {
+        toast.error("Failed to get user ID for deletion.");
+        return;
+      }
+      const res = await axiosInstance.delete(`/user/${id}`);
+      if (res.data.success) {
+        toast.success("User deleted successfully.");
+        getAllUsers();
+      } else {
+        toast.error("Failed to delete user.");
+      }
+    } catch (error) {
+      console.error("Error deleting user:", error);
+      toast.error("Error deleting user. Please try again.");
+    }
+  };
+
+  useEffect(() => {
+    getAllUsers();
+  }, []);
+
+  return (
+    <div className="shadow-md bg-blue-100 p-4 flex flex-col">
+      <h2 className="text-lg">User see this when logging in only.</h2>
+      <p className="text-xl">
+        Welcome <span className="text-3xl font-bold p-4">{user?.userName}</span>
+      </p>
+
+      {/* Form for adding or editing users */}
+      <form onSubmit={handleSubmit}>
+        <input
+          type="text"
+          name="fullName"
+          value={formData.fullName}
+          onChange={handleOnChange}
+          placeholder="Enter name"
+        />
+        <input
+          type="date"
+          name="DOB"
+          id="DOB"
+          value={formData.DOB}
+          onChange={handleOnChange}
+        />
+        <Button type="submit">{openEdit ? "Update User" : "Add User"}</Button>
+      </form>
+
+      {/* Table displaying all users */}
+      <div className="tableData pt-4 bg-red-200 p-4 rounded-md mt-4">
+        <div className="overflow-x-auto">
+          {result.length > 0 ? (
+            <table className="min-w-full border-collapse">
+              <thead>
+                <tr className="border border-black">
+                  <th className="w-1/8 border border-black">ID</th>
+                  <th className="w-3/8 border border-black">Name</th>
+                  <th className="w-2/8 border border-black">DOB</th>
+                  <th className="w-1/8 border border-black">Edit</th>
+                  <th className="w-1/8 border border-black">Delete</th>
+                </tr>
+              </thead>
+              <tbody>
+                {result.map((ele, i) => (
+                  <tr key={i} className="border border-black text-center">
+                    <td className="w-1/8 border border-black">{i + 1}</td>
+                    <td className="w-3/8 border border-black text-left pl-2">
+                      {ele.fullName}
+                    </td>
+                    <td className="w-3/8 border border-black text-left pl-2">
+                      {formatDate(ele.DOB)}
+                    </td>
+                    <td className="w-1/8 border border-black">
+                      <Button
+                        className="m-1"
+                        onClick={() => handleEditUser(ele)}
+                      >
+                        <Edit />
+                      </Button>
+                    </td>
+                    <td className="w-1/8 border border-black">
+                      <Button
+                        className="m-1"
+                        onClick={handleDeleteUser}
+                        data-id={ele._id}
+                      >
+                        <Trash2 />
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <p className="p-2">No Data...</p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default IfLogIn;
